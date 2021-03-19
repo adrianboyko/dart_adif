@@ -98,6 +98,25 @@ void main() {
     expect(header!['programid'], equals('LoTW'));
   });
 
+  test('Test Xlog ADIF', () async {
+
+    var input = File('testdata/xlog.adi').openRead();
+    var output = Record.parse(input);
+    Record? header;
+    await for (var record in output) {
+      if (record.isHeader == true) {
+        header = record;
+      }
+      else {
+        expect(record['call'], isNotNull);
+        expect(record['freq'], isNotNull);
+      }
+      //print(record);
+    }
+    expect(header, isNotNull);
+    expect(header!['ADIF_VER'], equals('2.2.7'));
+  });
+
 
 }
 
