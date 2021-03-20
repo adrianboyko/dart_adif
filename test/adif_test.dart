@@ -2,8 +2,10 @@
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:adif/src/record.dart';
 import 'package:test/test.dart';
+
+import 'package:adif/adif.dart';
+
 
 void main() {
   test('Basic Record Test', () async {
@@ -14,7 +16,7 @@ void main() {
       'bar': '1234',
     };
     var input = Uint8List.fromList(chunk.codeUnits);
-    var output = Record.parse(Stream.value(input));
+    var output = AdifTransformer.parse(Stream.value(input));
     await for (var record in output) {
       for (MapEntry e in expectedFields.entries) {
         var actual = record.getFieldValue(e.key);
@@ -32,7 +34,7 @@ void main() {
       'bar': '1234',
     };
     var input = Uint8List.fromList(chunk.codeUnits);
-    var output = Record.parse(Stream.value(input));
+    var output = AdifTransformer.parse(Stream.value(input));
     await for (var record in output) {
       for (MapEntry e in expectedFields.entries) {
         var actual = record.getFieldValue(e.key);
@@ -49,7 +51,7 @@ void main() {
       'STATION_CALL': 'KF4MDV',
     };
     var input = Uint8List.fromList(chunk.codeUnits);
-    var output = Record.parse(Stream.value(input));
+    var output = AdifTransformer.parse(Stream.value(input));
     await for (var record in output) {
       for (MapEntry e in expectedFields.entries) {
         var actual = record.getFieldValue(e.key);
@@ -69,7 +71,7 @@ void main() {
       'FOO': 'XYZ',
       'bar': '1234',
     };
-    var output = Record.parse(Stream.fromIterable(chunks));
+    var output = AdifTransformer.parse(Stream.fromIterable(chunks));
     await for (var record in output) {
       for (MapEntry e in expectations.entries) {
         var actual = record.getFieldValue(e.key);
@@ -82,8 +84,8 @@ void main() {
   test('Test LoTW ADIF', () async {
 
     var input = File('testdata/lotw.adi').openRead();
-    var output = Record.parse(input);
-    Record? header;
+    var output = AdifTransformer.parse(input);
+    AdifRecord? header;
     await for (var record in output) {
       if (record.isHeader == true) {
         header = record;
@@ -101,8 +103,8 @@ void main() {
   test('Test Xlog ADIF', () async {
 
     var input = File('testdata/xlog.adi').openRead();
-    var output = Record.parse(input);
-    Record? header;
+    var output = AdifTransformer.parse(input);
+    AdifRecord? header;
     await for (var record in output) {
       if (record.isHeader == true) {
         header = record;

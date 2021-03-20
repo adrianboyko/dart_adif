@@ -4,3 +4,4 @@
 library adif_parser;
 
 export 'src/record.dart';
+export 'src/transformer.dart';
