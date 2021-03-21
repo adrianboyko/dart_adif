@@ -9,84 +9,83 @@ import 'package:adif/adif.dart';
 
 void main() {
   test('Basic Record Test', () async {
-    var chunk = '<blah:2>AB<FOO:3>XYZ<bar:4:s>1234<eor>';
-    var expectedFields = {
+    final chunk = '<blah:2>AB<FOO:3>XYZ<bar:4:s>1234<eor>';
+    final expectedFields = {
       'blah': 'AB',
       'FOO': 'XYZ',
       'bar': '1234',
     };
-    var input = Uint8List.fromList(chunk.codeUnits);
-    var output = AdifTransformer.parse(Stream.value(input));
-    await for (var record in output) {
+    final input = Uint8List.fromList(chunk.codeUnits);
+    final output = parseAdif(Stream.value(input));
+    await for (final record in output) {
       for (MapEntry e in expectedFields.entries) {
-        var actual = record.getFieldValue(e.key);
-        var expected = e.value;
+        final actual = record.getFieldValue(e.key);
+        final expected = e.value;
         expect(actual, equals(expected));
       }
     }
   });
 
   test('Test comment after record', () async {
-    var chunk = '<blah:2>AB<FOO:3>XYZ<bar:4:s>1234<eor>  // Comment';
-    var expectedFields = {
+    final chunk = '<blah:2>AB<FOO:3>XYZ<bar:4:s>1234<eor>  // Comment';
+    final expectedFields = {
       'blah': 'AB',
       'FOO': 'XYZ',
       'bar': '1234',
     };
-    var input = Uint8List.fromList(chunk.codeUnits);
-    var output = AdifTransformer.parse(Stream.value(input));
-    await for (var record in output) {
+    final input = Uint8List.fromList(chunk.codeUnits);
+    final output = parseAdif(Stream.value(input));
+    await for (final record in output) {
       for (MapEntry e in expectedFields.entries) {
-        var actual = record.getFieldValue(e.key);
-        var expected = e.value;
+        final actual = record.getFieldValue(e.key);
+        final expected = e.value;
         expect(actual, equals(expected));
       }
     }
   });
 
   test('Test whitespace', () async {
-    var chunk = '  <call:4>W1AW  <STATION_CALL:6>KF4MDV  <eor>  ';
-    var expectedFields = {
+    final chunk = '  <call:4>W1AW  <STATION_CALL:6>KF4MDV  <eor>  ';
+    final expectedFields = {
       'call': 'W1AW',
       'STATION_CALL': 'KF4MDV',
     };
-    var input = Uint8List.fromList(chunk.codeUnits);
-    var output = AdifTransformer.parse(Stream.value(input));
-    await for (var record in output) {
+    final input = Uint8List.fromList(chunk.codeUnits);
+    final output = parseAdif(Stream.value(input));
+    await for (final record in output) {
       for (MapEntry e in expectedFields.entries) {
-        var actual = record.getFieldValue(e.key);
-        var expected = e.value;
+        final actual = record.getFieldValue(e.key);
+        final expected = e.value;
         expect(actual, equals(expected));
       }
     }
   });
 
   test('Test parsing across chunks', () async {
-    var chunks = [
+    final chunks = [
       Uint8List.fromList('<blah:02>AB <FOO:3>XYZ <bar:'.codeUnits),
       Uint8List.fromList('4:s>1234 <eor>'.codeUnits),
     ];
-    var expectations = {
+    final expectations = {
       'blah': 'AB',
       'FOO': 'XYZ',
       'bar': '1234',
     };
-    var output = AdifTransformer.parse(Stream.fromIterable(chunks));
-    await for (var record in output) {
+    final output = parseAdif(Stream.fromIterable(chunks));
+    await for (final record in output) {
       for (MapEntry e in expectations.entries) {
-        var actual = record.getFieldValue(e.key);
-        var expected = e.value;
+        final actual = record.getFieldValue(e.key);
+        final expected = e.value;
         expect(actual, equals(expected));
       }
     }
   });
 
   test('Test LoTW ADIF', () async {
-
-    var input = File('testdata/lotw.adi').openRead();
-    var output = AdifTransformer.parse(input);
+    final input = File('testdata/lotw.adi').openRead();
+    final output = parseAdif(input);
     AdifRecord? header;
-    await for (var record in output) {
+    await for (final record in output) {
       if (record.isHeader == true) {
         header = record;
       }
@@ -101,11 +100,10 @@ void main() {
   });
 
   test('Test Xlog ADIF', () async {
-
-    var input = File('testdata/xlog.adi').openRead();
-    var output = AdifTransformer.parse(input);
+    final input = File('testdata/xlog.adi').openRead();
+    final output = parseAdif(input);
     AdifRecord? header;
-    await for (var record in output) {
+    await for (final record in output) {
       if (record.isHeader == true) {
         header = record;
       }
@@ -119,6 +117,23 @@ void main() {
     expect(header!['ADIF_VER'], equals('2.2.7'));
   });
 
+  test('Test AdifTransformer', () async {
+    final adifFile = File('testdata/xlog.adi');
+    final recordStream = adifFile.openRead().transform(AdifTransformer());
+    AdifRecord? header;
+    await for (final record in recordStream) {
+      if (record.isHeader == true) {
+        header = record;
+      }
+      else {
+        expect(record['call'], isNotNull);
+        expect(record['freq'], isNotNull);
+      }
+      //print(record);
+    }
+    expect(header, isNotNull);
+    expect(header!['ADIF_VER'], equals('2.2.7'));
+  });
 
 }
 

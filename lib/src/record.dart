@@ -4,7 +4,7 @@ import 'fields.dart';
 
 class AdifRecord {
   final _values = <String, String>{};
-  bool? isHeader;
+  bool isHeader = false; // Assume the usual case, until proven otherwise.
 
   String? getFieldValue(String fieldName) {
     return _values[fieldName.toLowerCase()];
@@ -46,6 +46,9 @@ class AdifRecord {
       var isCustomField = !adifStandardFieldNames.contains(fName);
       if (isCustomField) _appendField(result, fName, fVal);
     });
+
+    // Append end-of-record/header tag
+    result.write(isHeader ? '<eoh>' : '<eor>');
 
     return result.toString();
   }
