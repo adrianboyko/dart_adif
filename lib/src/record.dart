@@ -1,9 +1,13 @@
 
+import 'dart:collection';
+
 import 'fields.dart';
 
 
 class AdifRecord {
+
   final _values = <String, String>{};
+  List<String>? _issues;
   bool isHeader = false; // Assume the usual case, until proven otherwise.
 
   String? getFieldValue(String fieldName) {
@@ -51,6 +55,14 @@ class AdifRecord {
     result.write(isHeader ? '<eoh>' : '<eor>');
 
     return result.toString();
+  }
+
+  void addIssue(String description) {
+    _issues == null ? _issues = [description] : _issues!.add(description);
+  }
+
+  UnmodifiableListView<String>? get issues {
+    return _issues == null ? null : UnmodifiableListView(_issues!);
   }
 
 }

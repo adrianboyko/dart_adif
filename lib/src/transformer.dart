@@ -27,6 +27,11 @@ class AdifTransformer extends StreamTransformerBase<List<int>, AdifRecord> {
   }
 }
 
+String _byteBufToStr(ByteData buf, int start, int end) {
+  var char_codes = Uint8List.view(buf.buffer, start, end);
+  return String.fromCharCodes(char_codes);
+}
+
 Stream<AdifRecord> parseAdif(Stream<List<int>> source) async* {
   var state = _ParserState.seekingTagStart;
   var tagNameBuf = ByteData(tagNameBufSize);
@@ -37,6 +42,8 @@ Stream<AdifRecord> parseAdif(Stream<List<int>> source) async* {
   var fieldValPos = 0;
   var fieldTypePos = 0;
   var wipRecord = AdifRecord();
+  var fieldNameTruncated = false;
+  var fieldValTruncated = false;
 
   await for (var bytes in source) {
     for (var byte in bytes) {
@@ -78,7 +85,7 @@ Stream<AdifRecord> parseAdif(Stream<List<int>> source) async* {
             state = _ParserState.collectingFieldValueLen;
           }
           else {
-            if (tagNamePos < tagNameBufSize - 1) {
+            if (tagNamePos < tagNameBufSize) {
               if (byte >= $A && byte <= $Z) {
                 byte += 32; // This converts tag names to lower case.
               }
@@ -86,7 +93,7 @@ Stream<AdifRecord> parseAdif(Stream<List<int>> source) async* {
               tagNamePos += 1;
             }
             else {
-              // TODO: Log a filed name truncation warning.
+              fieldNameTruncated = true; // We'll log this later.
             }
           }
           break;
@@ -108,8 +115,10 @@ Stream<AdifRecord> parseAdif(Stream<List<int>> source) async* {
           }
           else {
             // We've encountered a non-numeric char in field value length.
+            var fName = _byteBufToStr(tagNameBuf, 0, tagNamePos);
+            var badChar = String.fromCharCode(byte);
+            wipRecord.addIssue('Non-digit found in length spec: <$fName:$fieldValLen$badChar');
             // Might as well just give up and scan for the next field or eor.
-            // TODO: Log bad field length warning.
             state = _ParserState.seekingTagStart;
           }
           break;
@@ -120,7 +129,7 @@ Stream<AdifRecord> parseAdif(Stream<List<int>> source) async* {
             state = _ParserState.collectingFieldValue;
           }
           else {
-            if (fieldTypePos < fieldTypeBufSize - 1) {
+            if (fieldTypePos < fieldTypeBufSize) {
               fieldTypeBuf.setInt8(fieldTypePos, byte);
               fieldTypePos += 1;
             }
@@ -134,21 +143,30 @@ Stream<AdifRecord> parseAdif(Stream<List<int>> source) async* {
         case _ParserState.collectingFieldValue:
           if (fieldValLen > 0) {
             fieldValLen -= 1;
-            if (fieldValPos < fieldValBufSize - 1) {
+            if (fieldValPos < fieldValBufSize) {
               fieldValBuf.setInt8(fieldValPos, byte);
               fieldValPos += 1;
             }
             else {
-              // TODO: Log a field value truncation warning.
+              fieldValTruncated = true;
             }
             // state remains the same.
           }
           if (fieldValLen == 0) {
-            var fNameCCs = Uint8List.view(tagNameBuf.buffer, 0, tagNamePos);
-            var fValCCs = Uint8List.view(fieldValBuf.buffer, 0, fieldValPos);
-            var fName = String.fromCharCodes(fNameCCs);
-            var fVal = String.fromCharCodes(fValCCs);
+            var fName = _byteBufToStr(tagNameBuf, 0, tagNamePos);
+            var fVal = _byteBufToStr(fieldValBuf, 0, fieldValPos);
+
+            if (fieldNameTruncated) {
+              wipRecord.addIssue('Field name was truncated to: $fName');
+            }
+            if (fieldValTruncated) {
+              wipRecord.addIssue('Field value was truncated to: $fVal');
+            }
+
             wipRecord.setValue(fName, fVal);
+
+            fieldNameTruncated = false;
+            fieldValTruncated = false;
             state = _ParserState.seekingTagStart;
           }
       // end of cases
