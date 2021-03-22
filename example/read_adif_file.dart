@@ -1,10 +1,9 @@
 import 'dart:io';
-
-import 'package:adif/src/transformer.dart';
+import 'package:dart_adif/dart_adif.dart';
 
 void main() async {
-  final adifFile = File('testdata/xlog.adi');
-  final recordStream = adifFile.openRead().transform(AdifTransformer());
+  final adifStream = File('testdata/xlog.adi').openRead();
+  final recordStream = adifStream.transform(AdifTransformer());
   await for (var record in recordStream) {
     print(record);
   }
