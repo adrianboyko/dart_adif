@@ -1,3 +1,7 @@
+A Dart library to read and write ADIF (Amateur Radio Data Interchange Format) files.
+
+![CI Status](https://github.com/adrianboyko/dart_adif/actions/workflows/ci.yml/badge.svg)
+
 ## Usage
 
 A simple usage example:
