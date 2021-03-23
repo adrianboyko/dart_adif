@@ -1,4 +1,7 @@
 
+// This file is a port of: https://github.com/Matir/adifparser/blob/master/adifdef.go
+
+part of dart_adif;
 
 enum adifType {
   ADIFBoolean,

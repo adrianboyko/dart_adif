@@ -1,10 +1,5 @@
 
-import 'dart:async';
-import 'dart:typed_data';
-
-import 'package:charcode/charcode.dart';
-
-import 'record.dart';
+part of dart_adif;
 
 enum _ParserState {
   seekingTagStart,
@@ -14,16 +9,36 @@ enum _ParserState {
   collectingFieldValue,
 }
 
+/// The maximum length allowed for a tag/field name.
+///
+/// If this length is exceeded, the name will be truncated and an issue
+/// will be logged in [AdifRecord.issues].
 const tagNameBufSize = 50;
+
+/// The maximum length allowed for a field type.
+///
+/// If this length is exceeded, the type will be truncated and an issue
+/// will be logged in [AdifRecord.issues].
 const fieldTypeBufSize = 50;
+
+/// The maximum length of a field value.
+///
+/// If this length is exceeded, the value will be truncated and an issue
+/// will be logged in [AdifRecord.issues].
 const fieldValBufSize = 1024;
 
+/// Transforms a stream of byte chunks into a stream of [AdifRecord]s.
+///
+/// If any issues are encountered during the transformation, they are noted
+/// in [AdifRecord.issues] and the transformation continues.
+///
+/// See also `example/read_adif_file.dart`.ll
 class AdifTransformer extends StreamTransformerBase<List<int>, AdifRecord> {
   const AdifTransformer();
 
   @override
   Stream<AdifRecord> bind(Stream<List<int>> stream) {
-    return parseAdif(stream);
+    return _parseAdif(stream);
   }
 }
 
@@ -32,7 +47,7 @@ String _byteBufToStr(ByteData buf, int start, int end) {
   return String.fromCharCodes(char_codes);
 }
 
-Stream<AdifRecord> parseAdif(Stream<List<int>> source) async* {
+Stream<AdifRecord> _parseAdif(Stream<List<int>> source) async* {
   var state = _ParserState.seekingTagStart;
   var tagNameBuf = ByteData(tagNameBufSize);
   var fieldValBuf = ByteData(fieldValBufSize);
@@ -43,6 +58,7 @@ Stream<AdifRecord> parseAdif(Stream<List<int>> source) async* {
   var fieldTypePos = 0;
   var wipRecord = AdifRecord();
   var fieldNameTruncated = false;
+  var fieldTypeTruncated = false;
   var fieldValTruncated = false;
 
   await for (var bytes in source) {
@@ -117,7 +133,7 @@ Stream<AdifRecord> parseAdif(Stream<List<int>> source) async* {
             // We've encountered a non-numeric char in field value length.
             var fName = _byteBufToStr(tagNameBuf, 0, tagNamePos);
             var badChar = String.fromCharCode(byte);
-            wipRecord.addIssue('Non-digit found in length spec: <$fName:$fieldValLen$badChar');
+            wipRecord._addIssue('Non-digit found in length spec: <$fName:$fieldValLen$badChar');
             // Might as well just give up and scan for the next field or eor.
             state = _ParserState.seekingTagStart;
           }
@@ -134,7 +150,7 @@ Stream<AdifRecord> parseAdif(Stream<List<int>> source) async* {
               fieldTypePos += 1;
             }
             else {
-              // TODO: Log a field type truncation warning.
+              fieldTypeTruncated = true;
             }
             // state remains the same.
           }
@@ -150,23 +166,28 @@ Stream<AdifRecord> parseAdif(Stream<List<int>> source) async* {
             else {
               fieldValTruncated = true;
             }
-            // state remains the same.
           }
           if (fieldValLen == 0) {
             var fName = _byteBufToStr(tagNameBuf, 0, tagNamePos);
             var fVal = _byteBufToStr(fieldValBuf, 0, fieldValPos);
+            var fType = _byteBufToStr(fieldTypeBuf, 0, fieldTypePos);
 
             if (fieldNameTruncated) {
-              wipRecord.addIssue('Field name was truncated to: $fName');
+              wipRecord._addIssue('Field name was truncated to: $fName');
             }
             if (fieldValTruncated) {
-              wipRecord.addIssue('Field value was truncated to: $fVal');
+              wipRecord._addIssue('Field value was truncated to: $fVal');
+            }
+            if (fieldTypeTruncated) {
+              wipRecord._addIssue('Field type was truncated to: $fType');
             }
 
-            wipRecord.setValue(fName, fVal);
+            // TODO: Decide what to do with fType.
+            wipRecord.setFieldValue(fName, fVal);
 
             fieldNameTruncated = false;
             fieldValTruncated = false;
+            fieldTypeTruncated = false;
             state = _ParserState.seekingTagStart;
           }
       // end of cases
