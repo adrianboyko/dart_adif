@@ -40,3 +40,7 @@ jobs:
       # want to change this to 'flutter test'.
       - name: Run tests
         run: dart test
+
+      # Coverage
+      - name: Dart full coverage
+        uses: stelynx/dart-full-coverage@v1.0.3
