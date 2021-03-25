@@ -1,13 +1,13 @@
 name: dart_adif
 description: Read and write ADIF (Amateur Radio Data Interchange Format) files.
-version: 1.0.0
+version: 1.0.1
 homepage: https://github.com/adrianboyko/dart-adif
 
 environment:
   sdk: '>=2.12.0 <3.0.0'
 
-#dependencies:
-#  logging: ^1.0.0
+dependencies:
+  charcode: ^1.2.0
 
 dev_dependencies:
   pedantic: ^1.11.0
