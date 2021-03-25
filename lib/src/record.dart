@@ -1,11 +1,8 @@
-
 part of dart_adif;
 
 /// Represents a single ADIF record and its fields.
 class AdifRecord {
-
   final _values = <String, String>{};
-
   List<String>? _issues;
 
   /// Indicates whether the record represents the ADIF header or ADIF data.
@@ -32,7 +29,8 @@ class AdifRecord {
   ///
   /// The case of the provided field name does not matter and it will be
   /// converted to lower case, internally.
-  void setFieldValue(String fieldName, String fieldValue, [adifType fieldType = adifType.ADIFString]) {
+  void setFieldValue(String fieldName, String fieldValue,
+      [adifType fieldType = adifType.ADIFString]) {
     _values[fieldName] = fieldValue;
   }
 
@@ -52,7 +50,6 @@ class AdifRecord {
   /// The returned string can be written to an ADIF file.
   @override
   String toString() {
-
     var result = StringBuffer();
 
     // Append standard fields in order defined by adifFieldInfo map
@@ -85,6 +82,4 @@ class AdifRecord {
   UnmodifiableListView<String>? get issues {
     return _issues == null ? null : UnmodifiableListView(_issues!);
   }
-
 }
-

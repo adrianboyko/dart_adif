@@ -1,4 +1,3 @@
-
 // This file is a port of: https://github.com/Matir/adifparser/blob/master/adifdef.go
 
 part of dart_adif;
@@ -24,7 +23,7 @@ var typeCodeMap = <String, adifType>{
 };
 
 const adifFieldInfo = <String, adifType>{
-
+  // Common fields first:
   'call': adifType.ADIFString,
   'station_callsign': adifType.ADIFString,
   'band': adifType.ADIFString,
@@ -34,7 +33,7 @@ const adifFieldInfo = <String, adifType>{
   'qso_date_off': adifType.ADIFDate,
   'time_on': adifType.ADIFTime,
   'time_off': adifType.ADIFTime,
-
+  // Remaining fields in alphabetical order:
   'address': adifType.ADIFString,
   'age': adifType.ADIFNumber,
   'a_index': adifType.ADIFNumber,

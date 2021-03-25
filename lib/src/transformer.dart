@@ -1,4 +1,3 @@
-
 part of dart_adif;
 
 enum _ParserState {
@@ -68,8 +67,7 @@ Stream<AdifRecord> _parseAdif(Stream<List<int>> source) async* {
           if (byte == $lt) {
             tagNamePos = 0; // We're going to begin collecting a new tag name.
             state = _ParserState.collectingTagName;
-          }
-          else {
+          } else {
             // No action and state remains the same.
           }
           break;
@@ -80,13 +78,13 @@ Stream<AdifRecord> _parseAdif(Stream<List<int>> source) async* {
             // However, it also happens when email addresses are encountered in the header.
             // Example: Copyright (C) 2012 Bob Smith <person@example.com>
             var tnb = tagNameBuf.getInt8;
-            if (tnb(0) == $e && tnb(1) == $o && tnb(2) == $r) { // eor
+            if (tnb(0) == $e && tnb(1) == $o && tnb(2) == $r) {
+              // eor
               wipRecord.isHeader = false;
-            }
-            else if (tnb(0) == $e && tnb(1) == $o && tnb(2) == $h) { // eoh
+            } else if (tnb(0) == $e && tnb(1) == $o && tnb(2) == $h) {
+              // eoh
               wipRecord.isHeader = true;
-            }
-            else {
+            } else {
               // This is where we handle the non-eoh, non-eor case, mentioned above.
               // We'll just ignore <...> and start looking for another tag.
               state = _ParserState.seekingTagStart;
@@ -95,20 +93,17 @@ Stream<AdifRecord> _parseAdif(Stream<List<int>> source) async* {
             yield wipRecord; // yield the record we've been constructing.
             wipRecord = AdifRecord(); // create a new record to populate.
             state = _ParserState.seekingTagStart;
-          }
-          else if (byte == $colon) {
+          } else if (byte == $colon) {
             fieldValLen = 0; // We're going to begin collecting a new val len.
             state = _ParserState.collectingFieldValueLen;
-          }
-          else {
+          } else {
             if (tagNamePos < tagNameBufSize) {
               if (byte >= $A && byte <= $Z) {
                 byte += 32; // This converts tag names to lower case.
               }
               tagNameBuf.setInt8(tagNamePos, byte);
               tagNamePos += 1;
-            }
-            else {
+            } else {
               fieldNameTruncated = true; // We'll log this later.
             }
           }
@@ -118,22 +113,20 @@ Stream<AdifRecord> _parseAdif(Stream<List<int>> source) async* {
           if (byte == $colon) {
             fieldTypePos = 0;
             state = _ParserState.collectingFieldType;
-          }
-          else if (byte == $gt) {
+          } else if (byte == $gt) {
             fieldValPos = 0;
             state = _ParserState.collectingFieldValue;
-          }
-          else if ((byte >= $0) && (byte <= $9)) {
+          } else if ((byte >= $0) && (byte <= $9)) {
             // Note, no real need to guard against overflow.
             fieldValLen *= 10;
             fieldValLen += byte - $0;
             // state remains the same.
-          }
-          else {
+          } else {
             // We've encountered a non-numeric char in field value length.
             var fName = _byteBufToStr(tagNameBuf, 0, tagNamePos);
             var badChar = String.fromCharCode(byte);
-            wipRecord._addIssue('Non-digit found in length spec: <$fName:$fieldValLen$badChar');
+            wipRecord._addIssue(
+                'Non-digit found in length spec: <$fName:$fieldValLen$badChar');
             // Might as well just give up and scan for the next field or eor.
             state = _ParserState.seekingTagStart;
           }
@@ -143,13 +136,11 @@ Stream<AdifRecord> _parseAdif(Stream<List<int>> source) async* {
           if (byte == $gt) {
             fieldValPos = 0;
             state = _ParserState.collectingFieldValue;
-          }
-          else {
+          } else {
             if (fieldTypePos < fieldTypeBufSize) {
               fieldTypeBuf.setInt8(fieldTypePos, byte);
               fieldTypePos += 1;
-            }
-            else {
+            } else {
               fieldTypeTruncated = true;
             }
             // state remains the same.
@@ -162,8 +153,7 @@ Stream<AdifRecord> _parseAdif(Stream<List<int>> source) async* {
             if (fieldValPos < fieldValBufSize) {
               fieldValBuf.setInt8(fieldValPos, byte);
               fieldValPos += 1;
-            }
-            else {
+            } else {
               fieldValTruncated = true;
             }
           }
@@ -190,7 +180,7 @@ Stream<AdifRecord> _parseAdif(Stream<List<int>> source) async* {
             fieldTypeTruncated = false;
             state = _ParserState.seekingTagStart;
           }
-      // end of cases
+        // end of cases
       }
     }
   }

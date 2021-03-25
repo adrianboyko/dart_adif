@@ -1,4 +1,3 @@
-
 /// Tools for reading and writing ADIF, the amateur-radio data interchange format.
 library dart_adif;
 
