@@ -67,6 +67,19 @@ void main() {
     });
   });
 
+  group('Writing', () {
+    test('ToString', () async {
+      final inStr = '  <call:4>W1AW  <STATION_CALL:6>KF4MDV  <eor>  // comment';
+      final input = Stream.value(Uint8List.fromList(inStr.codeUnits));
+      final output = AdifTransformer().bind(input);
+      final expected = '<call:4>W1AW<station_call:6>KF4MDV<eor>';
+      await for (final record in output) {
+        expect(record.issues, isNull);
+        expect(record.toString(), equals(expected));
+      }
+    });
+  });
+
   group('Stream Transformer', () {
 
     test('Test parsing across chunks', () async {

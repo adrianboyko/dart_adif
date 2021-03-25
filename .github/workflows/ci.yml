@@ -39,11 +39,4 @@ jobs:
       # package:test for this step to succeed. Note that Flutter projects will
       # want to change this to 'flutter test'.
       - name: Run tests
-        run: dart test
-
-      # Coverage
-      - name: Dart full coverage
-        uses: stelynx/dart-full-coverage@v1.0.3
-        with:
-          package: dart_adif
-          ignore: "*_state.dart, do_not_import_me.dart"
+        run: flutter test --coverage
