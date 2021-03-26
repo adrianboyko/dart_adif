@@ -1,6 +1,6 @@
 name: dart_adif
 description: Read and write ADIF (Amateur Radio Data Interchange Format) files.
-version: 1.0.1
+version: 1.0.2
 homepage: https://github.com/adrianboyko/dart-adif
 
 environment:
