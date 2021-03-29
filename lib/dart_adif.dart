@@ -3,8 +3,8 @@ library dart_adif;
 
 import 'dart:collection';
 import 'dart:async';
-import 'dart:typed_data';
 import 'package:charcode/charcode.dart';
+import 'src/utils.dart';
 
 part 'src/fields.dart';
 part 'src/record.dart';

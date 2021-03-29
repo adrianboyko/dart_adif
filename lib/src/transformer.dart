@@ -1,11 +1,11 @@
 part of dart_adif;
 
-enum _ParserState {
+enum _State {
   seekingTagStart,
-  collectingTagName,
-  collectingFieldValueLen,
-  collectingFieldType,
-  collectingFieldValue,
+  collectingName,
+  collectingValLen,
+  collectingType,
+  collectingVal,
 }
 
 /// The maximum length allowed for a tag/field name.
@@ -30,157 +30,206 @@ const fieldValBufSize = 1024;
 ///
 /// If any issues are encountered during the transformation, they are noted
 /// in [AdifRecord.issues] and the transformation continues.
-///
-/// See also `example/read_adif_file.dart`.ll
 class AdifTransformer extends StreamTransformerBase<List<int>, AdifRecord> {
   const AdifTransformer();
 
   @override
   Stream<AdifRecord> bind(Stream<List<int>> stream) {
-    return _parseAdif(stream);
+    return _AdifParser().parse(stream);
   }
 }
 
-String _byteBufToStr(ByteData buf, int start, int end) {
-  var char_codes = Uint8List.view(buf.buffer, start, end);
-  return String.fromCharCodes(char_codes);
-}
+class _AdifParser {
+  final nameBuf = ByteDataWithPos(tagNameBufSize);
+  final valBuf = ByteDataWithPos(fieldValBufSize);
+  final typeBuf = ByteDataWithPos(fieldTypeBufSize);
+  var valLen = 0;
+  var wipRec = AdifRecord();
 
-Stream<AdifRecord> _parseAdif(Stream<List<int>> source) async* {
-  var state = _ParserState.seekingTagStart;
-  var tagNameBuf = ByteData(tagNameBufSize);
-  var fieldValBuf = ByteData(fieldValBufSize);
-  var fieldValLen = 0;
-  var fieldTypeBuf = ByteData(fieldTypeBufSize);
-  var tagNamePos = 0;
-  var fieldValPos = 0;
-  var fieldTypePos = 0;
-  var wipRecord = AdifRecord();
-  var fieldNameTruncated = false;
-  var fieldTypeTruncated = false;
-  var fieldValTruncated = false;
+  void storeByte(final _State state, final int byte) {
+    switch (state) {
+      case _State.seekingTagStart:
+        break; // This state doesn't store anything.
 
-  await for (var bytes in source) {
-    for (var byte in bytes) {
-      switch (state) {
-        case _ParserState.seekingTagStart:
-          if (byte == $lt) {
-            tagNamePos = 0; // We're going to begin collecting a new tag name.
-            state = _ParserState.collectingTagName;
-          } else {
-            // No action and state remains the same.
-          }
-          break;
+      case _State.collectingName:
+        var lcByte = (byte >= $A && byte <= $Z) ? byte | 32 : byte;
+        nameBuf.addInt8(lcByte);
+        break;
 
-        case _ParserState.collectingTagName:
-          if (byte == $gt) {
-            // Ideally, this would only happen when we encounter <eoh> pr <eor>.
-            // However, it also happens when email addresses are encountered in the header.
-            // Example: Copyright (C) 2012 Bob Smith <person@example.com>
-            var tnb = tagNameBuf.getInt8;
-            if (tnb(0) == $e && tnb(1) == $o && tnb(2) == $r) {
-              // eor
-              wipRecord.isHeader = false;
-            } else if (tnb(0) == $e && tnb(1) == $o && tnb(2) == $h) {
-              // eoh
-              wipRecord.isHeader = true;
-            } else {
-              // This is where we handle the non-eoh, non-eor case, mentioned above.
-              // We'll just ignore <...> and start looking for another tag.
-              state = _ParserState.seekingTagStart;
-              break;
-            }
-            yield wipRecord; // yield the record we've been constructing.
-            wipRecord = AdifRecord(); // create a new record to populate.
-            state = _ParserState.seekingTagStart;
-          } else if (byte == $colon) {
-            fieldValLen = 0; // We're going to begin collecting a new val len.
-            state = _ParserState.collectingFieldValueLen;
-          } else {
-            if (tagNamePos < tagNameBufSize) {
-              if (byte >= $A && byte <= $Z) {
-                byte += 32; // This converts tag names to lower case.
-              }
-              tagNameBuf.setInt8(tagNamePos, byte);
-              tagNamePos += 1;
-            } else {
-              fieldNameTruncated = true; // We'll log this later.
-            }
-          }
-          break;
+      case _State.collectingValLen:
+        valLen *= 10; // TODO: guard against overflow.
+        valLen += byte - $0; // TODO: guard against overflow.
+        break;
 
-        case _ParserState.collectingFieldValueLen:
-          if (byte == $colon) {
-            fieldTypePos = 0;
-            state = _ParserState.collectingFieldType;
-          } else if (byte == $gt) {
-            fieldValPos = 0;
-            state = _ParserState.collectingFieldValue;
-          } else if ((byte >= $0) && (byte <= $9)) {
-            // Note, no real need to guard against overflow.
-            fieldValLen *= 10;
-            fieldValLen += byte - $0;
-            // state remains the same.
-          } else {
-            // We've encountered a non-numeric char in field value length.
-            var fName = _byteBufToStr(tagNameBuf, 0, tagNamePos);
+      case _State.collectingType:
+        typeBuf.addInt8(byte);
+        break;
+
+      case _State.collectingVal:
+        assert(valLen >= 0);
+        valBuf.addInt8(byte);
+    }
+  }
+
+  _State getNextState(final _State currState, final int byte) {
+    switch (currState) {
+      case _State.seekingTagStart:
+        switch (byte) {
+          case $lt:
+            return _State.collectingName;
+          default:
+            return currState;
+        }
+
+      case _State.collectingName:
+        switch (byte) {
+          case $gt:
+            // We've presumably collected eo[hr], so look for the next tag.
+            return _State.seekingTagStart;
+          case $colon:
+            return _State.collectingValLen;
+          default:
+            return currState;
+        }
+
+      case _State.collectingValLen:
+        switch (byte) {
+          case $colon:
+            return _State.collectingType;
+          case $gt:
+            return _State.collectingVal;
+          case $0:
+          case $1:
+          case $2:
+          case $3:
+          case $4:
+          case $5:
+          case $6:
+          case $7:
+          case $8:
+          case $9:
+            return currState;
+          default:
+            // We've encountered a non-numeric char in a field value length.
             var badChar = String.fromCharCode(byte);
-            wipRecord._addIssue(
-                'Non-digit found in length spec: <$fName:$fieldValLen$badChar');
-            // Might as well just give up and scan for the next field or eor.
-            state = _ParserState.seekingTagStart;
-          }
-          break;
+            var badTag = '<...:$valLen$badChar...>';
+            wipRec._addIssue('Non-digit found in length spec: $badTag');
+            // Might as well just give up and scan for the next field or eo[rh].
+            return _State.seekingTagStart;
+        }
 
-        case _ParserState.collectingFieldType:
-          if (byte == $gt) {
-            fieldValPos = 0;
-            state = _ParserState.collectingFieldValue;
+      case _State.collectingType:
+        switch (byte) {
+          case $gt:
+            return _State.collectingVal;
+          default:
+            return currState;
+        }
+
+      case _State.collectingVal:
+        if (--valLen == 0) {
+          // Because this transition is triggered by a countdown instead of by
+          // an input byte that indicates the transition, we need to perform
+          // a nonstandard _storeByte here so that the current byte isn't lost.
+          storeByte(currState, byte);
+          return _State.seekingTagStart;
+        } else {
+          return currState;
+        }
+    }
+  }
+
+  AdifRecord? reactToTransition(final _State oldState, final _State newState) {
+    switch (oldState) {
+      case _State.seekingTagStart:
+        // No action required when leaving this state.
+        break;
+
+      case _State.collectingName:
+        if (newState == _State.seekingTagStart) {
+          // We have encountered a tag with no value, probably eor or eoh.
+          var tnb = nameBuf.getInt8;
+          var isEndOfTag = tnb(0) == $e && tnb(1) == $o;
+          var isEorTag = isEndOfTag && tnb(2) == $r;
+          var isEohTag = isEndOfTag && tnb(2) == $h;
+          if (isEorTag || isEohTag) {
+            wipRec.isHeader = isEohTag;
+            var completedRecord = wipRec;
+            wipRec = AdifRecord(); // create a new record to populate.
+            return completedRecord;
           } else {
-            if (fieldTypePos < fieldTypeBufSize) {
-              fieldTypeBuf.setInt8(fieldTypePos, byte);
-              fieldTypePos += 1;
-            } else {
-              fieldTypeTruncated = true;
-            }
-            // state remains the same.
+            var fName = nameBuf.dataAsStr;
+            wipRec._addIssue('Expected <eoh> or <eor> but found <$fName>');
           }
-          break;
+        }
+        break;
 
-        case _ParserState.collectingFieldValue:
-          if (fieldValLen > 0) {
-            fieldValLen -= 1;
-            if (fieldValPos < fieldValBufSize) {
-              fieldValBuf.setInt8(fieldValPos, byte);
-              fieldValPos += 1;
-            } else {
-              fieldValTruncated = true;
-            }
-          }
-          if (fieldValLen == 0) {
-            var fName = _byteBufToStr(tagNameBuf, 0, tagNamePos);
-            var fVal = _byteBufToStr(fieldValBuf, 0, fieldValPos);
-            var fType = _byteBufToStr(fieldTypeBuf, 0, fieldTypePos);
+      case _State.collectingValLen:
+        // No action required when leaving this state.
+        break;
 
-            if (fieldNameTruncated) {
-              wipRecord._addIssue('Field name was truncated to: $fName');
-            }
-            if (fieldValTruncated) {
-              wipRecord._addIssue('Field value was truncated to: $fVal');
-            }
-            if (fieldTypeTruncated) {
-              wipRecord._addIssue('Field type was truncated to: $fType');
-            }
+      case _State.collectingType:
+        // No action required when leaving this state.
+        break;
 
-            // TODO: Decide what to do with fType.
-            wipRecord.setFieldValue(fName, fVal);
+      case _State.collectingVal:
+        var fName = nameBuf.dataAsStr;
+        var fVal = valBuf.dataAsStr;
+        var fType = typeBuf.dataAsStr;
+        if (nameBuf.truncated) {
+          wipRec._addIssue('Field name was truncated to: $fName');
+        }
+        if (valBuf.truncated) {
+          wipRec._addIssue('Field value was truncated to: $fVal');
+        }
+        if (typeBuf.truncated) {
+          wipRec._addIssue('Field type was truncated to: $fType');
+        }
+        // TODO: Decide what to do with fType.
+        wipRec.setFieldValue(fName, fVal);
+        // We deviate from true FSM here by forcing the next state:
+        break;
+    }
 
-            fieldNameTruncated = false;
-            fieldValTruncated = false;
-            fieldTypeTruncated = false;
-            state = _ParserState.seekingTagStart;
-          }
-        // end of cases
+    switch (newState) {
+      case _State.seekingTagStart:
+        // No action required when entering this state.
+        break;
+
+      case _State.collectingName:
+        nameBuf.reset();
+        break;
+
+      case _State.collectingValLen:
+        valLen = 0;
+        break;
+
+      case _State.collectingType:
+        typeBuf.reset();
+        break;
+
+      case _State.collectingVal:
+        valBuf.reset();
+        break;
+    }
+  }
+
+  Stream<AdifRecord> parse(Stream<List<int>> source) async* {
+    var state = _State.seekingTagStart;
+    await for (var bytes in source) {
+      for (var byte in bytes) {
+        var nextState = getNextState(state, byte);
+
+        // Either the byte drove a state change that we should react to
+        // or the byte is data that needs to be saved.
+        if (state != nextState) {
+          var maybeRecord = reactToTransition(state, nextState);
+          if (maybeRecord != null) yield maybeRecord;
+        } else {
+          storeByte(state, byte);
+        }
+
+        state = nextState;
       }
     }
   }
