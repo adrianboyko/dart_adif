@@ -19,7 +19,9 @@ void main() {
       };
       final input = Stream.value(Uint8List.fromList(chunk.codeUnits));
       final output = AdifTransformer().bind(input);
+      var recCount = 0;
       await for (final record in output) {
+        recCount += 1;
         expect(record.issues, isNull);
         for (MapEntry e in expectedFields.entries) {
           final actual = record[e.key];
@@ -27,6 +29,7 @@ void main() {
           expect(actual, equals(expected));
         }
       }
+      expect(recCount, equals(1));
     });
 
     test('Test comment after record', () async {
@@ -38,7 +41,9 @@ void main() {
       };
       final input = Stream.value(Uint8List.fromList(chunk.codeUnits));
       final output = AdifTransformer().bind(input);
+      var recCount = 0;
       await for (final record in output) {
+        recCount += 1;
         expect(record.issues, isNull);
         for (MapEntry e in expectedFields.entries) {
           final actual = record[e.key];
@@ -46,6 +51,7 @@ void main() {
           expect(actual, equals(expected));
         }
       }
+      expect(recCount, equals(1));
     });
 
     test('Test whitespace', () async {
@@ -56,7 +62,9 @@ void main() {
       };
       final input = Stream.value(Uint8List.fromList(chunk.codeUnits));
       final output = AdifTransformer().bind(input);
+      var recCount = 0;
       await for (final record in output) {
+        recCount += 1;
         expect(record.issues, isNull);
         for (MapEntry e in expectedFields.entries) {
           final actual = record[e.key];
@@ -64,6 +72,7 @@ void main() {
           expect(actual, equals(expected));
         }
       }
+      expect(recCount, equals(1));
     });
   });
 
@@ -73,10 +82,13 @@ void main() {
       final input = Stream.value(Uint8List.fromList(inStr.codeUnits));
       final output = AdifTransformer().bind(input);
       final expected = '<call:4>W1AW<station_call:6>KF4MDV<eor>';
+      var recCount = 0;
       await for (final record in output) {
+        recCount += 1;
         expect(record.issues, isNull);
         expect(record.toString(), equals(expected));
       }
+      expect(recCount, equals(1));
     });
   });
 
@@ -94,7 +106,9 @@ void main() {
       };
       final input = Stream.fromIterable(chunks);
       final output = AdifTransformer().bind(input);
+      var recCount = 0;
       await for (final record in output) {
+        recCount += 1;
         expect(record.issues, isNull);
         for (MapEntry e in expectations.entries) {
           final actual = record[e.key];
@@ -102,6 +116,7 @@ void main() {
           expect(actual, equals(expected));
         }
       }
+      expect(recCount, equals(1));
     });
 
     test('Test as argument to transform() method', () async {
@@ -200,7 +215,7 @@ void main() {
       final output = AdifTransformer().bind(input);
       await for (final record in output) {
         expect(record.issues!.length, equals(1));
-        expect(record.issues!.first, contains('foo'));
+        expect(record.issues!.first, contains('4a'));
         for (MapEntry e in expectedFields.entries) {
           final actual = record[e.key];
           final expected = e.value;
@@ -243,7 +258,10 @@ void main() {
         }
       }
       expect(header, isNotNull);
-      expect(header!['ADIF_VER'], equals('2.2.7'));
+      expect(header!.issues!.length, equals(2));
+      expect(header.issues, contains('Expected <eoh> or <eor> but found <andystewart@comcast.net>'));
+      expect(header.issues, contains('Expected <eoh> or <eor> but found <pg4i@amsat.org>'));
+      expect(header['ADIF_VER'], equals('2.2.7'));
     });
 
   });
